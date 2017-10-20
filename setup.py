@@ -35,7 +35,7 @@ if "EASYWEBDAV_DEV" in os.environ:
     properties["install_requires"].append((
         "nose",
         "yanc",
-        "PyWebDAV",
+        "PyWebDAV3",
         ))
 
 setup(**properties)

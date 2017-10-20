@@ -4,16 +4,17 @@ from numbers import Number
 import xml.etree.cElementTree as xml
 from collections import namedtuple
 
-py_majversion, py_minversion, py_revversion = platform.python_version_tuple()
+import platform
 
-if py_majversion == '2':
-    from httplib import responses as HTTP_CODES
-    from urlparse import urlparse
+python_version, _, __ = platform.python_version_tuple()
+if python_version == '2':
+    from StringIO import StringIO
 else:
-    from http.client import responses as HTTP_CODES
-    from urllib.parse import urlparse
+    from io import StringIO
+
 
 DOWNLOAD_CHUNK_SIZE_BYTES = 1 * 1024 * 1024
+UPLOAD_CHUNK_SIZE_CHARS = DOWNLOAD_CHUNK_SIZE_BYTES / 8
 
 class WebdavException(Exception):
     pass
@@ -150,18 +151,21 @@ class Client(object):
         self._send('DELETE', path, 204)
 
     def upload(self, local_path_or_fileobj, remote_path):
-        if isinstance(local_path_or_fileobj, basestring):
+        if isinstance(local_path_or_fileobj, str):
             with open(local_path_or_fileobj, 'rb') as f:
                 self._upload(f, remote_path)
         else:
             self._upload(local_path_or_fileobj, remote_path)
 
     def _upload(self, fileobj, remote_path):
+        if isinstance(fileobj, StringIO):
+            data = fileobj.read()
+            fileobj = data.encode('utf-8')
         self._send('PUT', remote_path, (200, 201, 204), data=fileobj)
 
     def download(self, remote_path, local_path_or_fileobj):
         response = self._send('GET', remote_path, 200, stream=True)
-        if isinstance(local_path_or_fileobj, basestring):
+        if isinstance(local_path_or_fileobj, str) or isinstance(local_path_or_fileobj, bytes):
             with open(local_path_or_fileobj, 'wb') as f:
                 self._download(f, response)
         else:
@@ -169,7 +173,10 @@ class Client(object):
 
     def _download(self, fileobj, response):
         for chunk in response.iter_content(DOWNLOAD_CHUNK_SIZE_BYTES):
-            fileobj.write(chunk)
+            if isinstance(fileobj, StringIO):
+                fileobj.write(chunk.decode('utf-8'))
+            else:
+                fileobj.write(chunk)
 
     def ls(self, remote_path='.'):
         headers = {'Depth': '1'}
